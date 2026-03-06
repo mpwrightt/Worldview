@@ -57,7 +57,7 @@ const EventPanel = () => {
   const { events, isLoading } = useAllRealTimeData()
 
   // Convert Convex events to local format
-  const localEvents = events.map(convertEvent)
+  const localEvents: Event[] = events.map((e: any) => convertEvent(e))
 
   if (isLoading) {
     return (

@@ -47,7 +47,7 @@ const Timeline = ({ onPlayPause, isPlaying }: TimelineProps) => {
     setTime(newTime)
   }, [startTime, endTime, totalDuration, setTime])
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     setIsDragging(true)
     handleTimelineClick(e)
   }
