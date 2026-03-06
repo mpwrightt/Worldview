@@ -1,0 +1,23 @@
+{
+  "name": "worldview-osint",
+  "version": "1.0.0",
+  "description": "WorldView OSINT - Real-time flight and satellite tracking",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npx convex dev\" \"cd frontend && npm run dev\"",
+    "build": "cd frontend && npm run build",
+    "deploy": "npx convex deploy && cd frontend && vercel --prod",
+    "deploy:convex": "npx convex deploy",
+    "deploy:vercel": "cd frontend && vercel --prod",
+    "setup": "npm install && cd frontend && npm install",
+    "fetch:flights": "npx convex run ingest_flight:fetchOpenSky",
+    "fetch:satellites": "npx convex run ingest_satellite:fetchCelesTrak '{\"group\": \"visual\"}'"
+  },
+  "dependencies": {
+    "convex": "^1.32.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}
