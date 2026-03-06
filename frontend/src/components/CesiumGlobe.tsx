@@ -1,13 +1,7 @@
-import { useEffect, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import * as Cesium from 'cesium'
 import { useGlobeStore } from '../store/globeStore'
 import { useAllRealTimeData } from '../hooks/useRealTimeData'
-
-const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || ''
-
-if (CESIUM_ION_TOKEN) {
-  Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN
-}
 
 const CesiumGlobe = () => {
   const cesiumContainer = useRef<HTMLDivElement>(null)
@@ -36,12 +30,6 @@ const CesiumGlobe = () => {
     if (!cesiumContainer.current || viewerRef.current) return
 
     const viewer = new Cesium.Viewer(cesiumContainer.current, {
-      imageryProvider: CESIUM_ION_TOKEN 
-        ? new Cesium.IonImageryProvider({ assetId: 2 })
-        : new Cesium.BingMapsImageryProvider({ 
-            key: '', 
-            mapStyle: Cesium.BingMapsStyle.AERIAL 
-          }),
       terrainProvider: new Cesium.EllipsoidTerrainProvider(),
       baseLayerPicker: true,
       geocoder: false,
@@ -73,8 +61,12 @@ const CesiumGlobe = () => {
     
     viewer.scene.globe.depthTestAgainstTerrain = false
     viewer.scene.globe.enableLighting = true
-    viewer.scene.skyBox.show = true
-    viewer.scene.skyAtmosphere.show = true
+    if (viewer.scene.skyBox) {
+      viewer.scene.skyBox.show = true
+    }
+    if (viewer.scene.skyAtmosphere) {
+      viewer.scene.skyAtmosphere.show = true
+    }
     viewer.scene.backgroundColor = Cesium.Color.BLACK
     
     viewer.camera.setView({
@@ -112,7 +104,7 @@ const CesiumGlobe = () => {
     dataSource.entities.removeAll()
 
     // Add real events from Convex
-    events.forEach((event) => {
+    events.forEach((event: any) => {
       if (!event.latitude || !event.longitude) return
 
       const isMilitary = event.properties?.military === true

@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
 import { AlertTriangle, Plane, Satellite, Radio, Wifi, Activity, X } from 'lucide-react'
 import { useGlobeStore, LayerType, Event } from '../store/globeStore'
+import { useAllRealTimeData } from '../hooks/useRealTimeData'
 import { format } from 'date-fns'
 
 const getEventIcon = (type: LayerType) => {
@@ -37,130 +37,99 @@ const getEventColor = (type: LayerType) => {
   }
 }
 
-// Mock events for demo
-const mockEvents: Event[] = [
-  {
-    id: '1',
-    type: 'gps_interference',
-    title: 'GPS Interference Detected',
-    description: '65% of aircraft reporting GPS issues in region',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    latitude: 55.7558,
-    longitude: 37.6173,
-    properties: { severity: 'high', percentage: 65, radius_km: 100 },
-    source: 'GPSJAM',
-    confidence: 0.85
-  },
-  {
-    id: '2',
-    type: 'internet_outage',
-    title: 'Internet Outage: Syria',
-    description: 'Critical connectivity drop detected',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45),
-    latitude: 33.5138,
-    longitude: 36.2765,
-    properties: { country: 'Syria', severity: 'critical', drop_pct: 78 },
-    source: 'IODA',
-    confidence: 0.92
-  },
-  {
-    id: '3',
-    type: 'flight',
-    title: 'Flight AAL123',
-    description: 'Commercial flight en route',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5),
-    latitude: 40.7128,
-    longitude: -74.006,
-    altitude: 10000,
-    properties: { callsign: 'AAL123', icao24: 'a1b2c3', velocity: 250 },
-    source: 'OpenSky',
-    confidence: 0.95
-  },
-  {
-    id: '4',
-    type: 'network_probe',
-    title: 'OONI: Anomaly Detected',
-    description: 'Web connectivity test showing blocking',
-    timestamp: new Date(Date.now() - 1000 * 60 * 15),
-    latitude: 35.6892,
-    longitude: 51.389,
-    properties: { target: 'example.com', is_anomaly: true },
-    source: 'OONI',
-    confidence: 0.75
-  },
-  {
-    id: '5',
-    type: 'gps_interference',
-    title: 'GPS Interference Detected',
-    description: 'Medium severity jamming detected',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60),
-    latitude: 35.6892,
-    longitude: 51.389,
-    properties: { severity: 'medium', percentage: 35 },
-    source: 'GPSJAM',
-    confidence: 0.65
-  }
-]
+// Convert Convex event to local Event type
+const convertEvent = (event: any): Event => ({
+  id: event._id,
+  type: event.eventType as LayerType,
+  title: event.title,
+  description: event.description || '',
+  timestamp: new Date(event.timestamp),
+  latitude: event.latitude || 0,
+  longitude: event.longitude || 0,
+  altitude: event.altitude,
+  properties: event.properties || {},
+  source: event.sourceName,
+  confidence: event.confidenceScore || 0.9,
+})
 
 const EventPanel = () => {
-  const { selectedEvent, setSelectedEvent, addEvent } = useGlobeStore()
+  const { selectedEvent, setSelectedEvent } = useGlobeStore()
+  const { events, isLoading } = useAllRealTimeData()
 
-  // Add mock events on mount
-  useEffect(() => {
-    mockEvents.forEach(event => addEvent(event))
-  }, [])
+  // Convert Convex events to local format
+  const localEvents = events.map(convertEvent)
+
+  if (isLoading) {
+    return (
+      <div className="panel">
+        <div className="panel-header">
+          <span>Recent Events</span>
+        </div>
+        <div className="panel-content p-4 text-center text-gray-400">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-2"></div>
+          <p className="text-sm">Loading events...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="panel">
       <div className="panel-header">
         <span>Recent Events</span>
         <span className="text-xs text-gray-400">
-          {mockEvents.length} events
+          {localEvents.length} events
         </span>
       </div>
       
       <div className="panel-content space-y-2 max-h-[50vh] overflow-y-auto">
-        {mockEvents.map((event) => (
-          <div
-            key={event.id}
-            onClick={() => setSelectedEvent(event)}
-            className={`p-3 rounded-lg bg-gray-800/50 border-l-2 ${getEventColor(event.type)} 
-              cursor-pointer hover:bg-gray-800 transition-colors
-              ${selectedEvent?.id === event.id ? 'ring-1 ring-blue-500 bg-gray-800' : ''}
-            `}
-          >
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5">
-                {getEventIcon(event.type)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-sm truncate">
-                    {event.title}
-                  </span>
-                  <span className="text-xs text-gray-500 shrink-0">
-                    {format(event.timestamp, 'HH:mm')}
-                  </span>
+        {localEvents.length === 0 ? (
+          <p className="text-center text-gray-400 text-sm py-4">
+            No events yet. Run data ingestion to populate.
+          </p>
+        ) : (
+          localEvents.map((event) => (
+            <div
+              key={event.id}
+              onClick={() => setSelectedEvent(event)}
+              className={`p-3 rounded-lg bg-gray-800/50 border-l-2 ${getEventColor(event.type)} 
+                cursor-pointer hover:bg-gray-800 transition-colors
+                ${selectedEvent?.id === event.id ? 'ring-1 ring-blue-500 bg-gray-800' : ''}
+              `}
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">
+                  {getEventIcon(event.type)}
                 </div>
-                <p className="text-xs text-gray-400 mt-1 line-clamp-2">
-                  {event.description}
-                </p>
-                <div className="flex items-center gap-3 mt-2 text-xs">
-                  <span className="text-gray-500">
-                    Source: {event.source}
-                  </span>
-                  <span className={`${
-                    event.confidence > 0.8 ? 'text-green-400' :
-                    event.confidence > 0.5 ? 'text-yellow-400' :
-                    'text-red-400'
-                  }`}>
-                    {(event.confidence * 100).toFixed(0)}% confidence
-                  </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-sm truncate">
+                      {event.title}
+                    </span>
+                    <span className="text-xs text-gray-500 shrink-0">
+                      {format(event.timestamp, 'HH:mm')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                    {event.description}
+                  </p>
+                  <div className="flex items-center gap-3 mt-2 text-xs">
+                    <span className="text-gray-500">
+                      Source: {event.source}
+                    </span>
+                    <span className={`${
+                      event.confidence > 0.8 ? 'text-green-400' :
+                      event.confidence > 0.5 ? 'text-yellow-400' :
+                      'text-red-400'
+                    }`}>
+                      {(event.confidence * 100).toFixed(0)}% confidence
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Event Detail View */}

@@ -1,11 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import CesiumGlobe from './components/CesiumGlobe'
 import LayerPanel from './components/LayerPanel'
 import { RotateCcw } from 'lucide-react'
 
 function App() {
   const [showLayers, setShowLayers] = useState(true)
-  const cesiumRef = useRef<any>(null)
 
   const resetView = () => {
     // Access the reset function exposed by CesiumGlobe

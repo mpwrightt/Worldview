@@ -31,11 +31,17 @@ interface GlobeState {
   startTime: Date
   endTime: Date
   isPlaying: boolean
+  playbackSpeed: number
   setTime: (time: Date) => void
   setPlaying: (playing: boolean) => void
+  setPlaybackSpeed: (speed: number) => void
   
   selectedEvent: Event | null
   setSelectedEvent: (event: Event | null) => void
+  
+  events: Event[]
+  addEvent: (event: Event) => void
+  setEvents: (events: Event[]) => void
 }
 
 export const useGlobeStore = create<GlobeState>((set, get) => ({
@@ -54,10 +60,19 @@ export const useGlobeStore = create<GlobeState>((set, get) => ({
   startTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
   endTime: new Date(),
   isPlaying: false,
+  playbackSpeed: 1,
 
   setTime: (time) => set({ currentTime: time }),
   setPlaying: (playing) => set({ isPlaying: playing }),
+  setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
 
   selectedEvent: null,
   setSelectedEvent: (event) => set({ selectedEvent: event }),
+  
+  events: [],
+  addEvent: (event) => {
+    const { events } = get()
+    set({ events: [...events, event] })
+  },
+  setEvents: (events) => set({ events }),
 }))

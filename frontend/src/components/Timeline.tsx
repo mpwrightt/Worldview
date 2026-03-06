@@ -52,7 +52,7 @@ const Timeline = ({ onPlayPause, isPlaying }: TimelineProps) => {
     handleTimelineClick(e)
   }
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: globalThis.MouseEvent) => {
     if (!isDragging || !progressRef.current) return
     const rect = progressRef.current.getBoundingClientRect()
     const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
