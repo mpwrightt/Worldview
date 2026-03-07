@@ -1,6 +1,30 @@
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 
+function parseProperties(propertiesJson?: string) {
+  if (!propertiesJson) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(propertiesJson);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeEvents<T extends Array<Record<string, any>> | undefined>(events: T) {
+  if (!events) {
+    return [];
+  }
+
+  return events.map((event) => ({
+    ...event,
+    properties: event.properties ?? parseProperties(event.propertiesJson),
+  }));
+}
+
 // Hook to get real flight data from Convex
 export function useRealTimeFlights(limit = 500) {
   const flights = useQuery(api.events.list, { 
@@ -8,7 +32,7 @@ export function useRealTimeFlights(limit = 500) {
     limit 
   });
   
-  return flights || [];
+  return normalizeEvents(flights);
 }
 
 // Hook to get real satellite data from Convex
@@ -18,7 +42,7 @@ export function useRealTimeSatellites(limit = 200) {
     limit 
   });
   
-  return satellites || [];
+  return normalizeEvents(satellites);
 }
 
 // Hook to get all real-time data
@@ -27,7 +51,7 @@ export function useAllRealTimeData() {
   const stats = useQuery(api.events.stats);
   
   return {
-    events: events || [],
+    events: normalizeEvents(events),
     stats: stats || { total: 0, byType: {} },
     isLoading: events === undefined,
   };

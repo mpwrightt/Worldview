@@ -11,11 +11,15 @@ if (CESIUM_ION_TOKEN) {
   Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN
 }
 
+if (GOOGLE_MAPS_API_KEY) {
+  Cesium.GoogleMaps.defaultApiKey = GOOGLE_MAPS_API_KEY
+}
+
 const CesiumGlobe = () => {
   const cesiumContainer = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
   const dataSourceRef = useRef<Cesium.CustomDataSource | null>(null)
-  const tilesetRef = useRef<any>(null)
+  const tilesetRef = useRef<Cesium.Cesium3DTileset | null>(null)
   const { activeLayers } = useGlobeStore()
   const { events, stats, isLoading } = useAllRealTimeData()
   const [globeReady, setGlobeReady] = useState(false)
@@ -56,22 +60,21 @@ const CesiumGlobe = () => {
       selectionIndicator: true,
       skyAtmosphere: new Cesium.SkyAtmosphere(),
       scene3DOnly: false,
+      globe: new Cesium.Globe(Cesium.Ellipsoid.WGS84),
     })
 
     const initializeScene = async () => {
       // Try to add Google 3D Tiles if API key is available
       if (GOOGLE_MAPS_API_KEY) {
         try {
-          // Create Google 3D Tiles tileset
-          const tileset = await Cesium.Cesium3DTileset.fromUrl(
-            `https://tile.googleapis.com/v1/3dtiles/root.json?key=${GOOGLE_MAPS_API_KEY}`,
-            {
-              showCreditsOnScreen: false,
-            }
-          )
+          // Create Google Photorealistic 3D Tiles tileset
+          const tileset = await Cesium.createGooglePhotorealistic3DTileset()
           
           viewer.scene.primitives.add(tileset)
           tilesetRef.current = tileset
+          if (viewer.scene.globe) {
+            viewer.scene.globe.show = false
+          }
           
           // Fly to San Francisco to show off the 3D buildings
           viewer.camera.flyTo({
@@ -87,6 +90,9 @@ const CesiumGlobe = () => {
           console.log('Google 3D Tiles added successfully')
         } catch (error) {
           console.error('Failed to load Google 3D Tiles:', error)
+          if (viewer.scene.globe) {
+            viewer.scene.globe.show = true
+          }
           // Fallback to default view
           viewer.camera.setView({
             destination: Cesium.Cartesian3.fromDegrees(0, 20, 25000000),
@@ -138,8 +144,10 @@ const CesiumGlobe = () => {
       Cesium.CameraEventType.PINCH,
     ]
     
-    viewer.scene.globe.depthTestAgainstTerrain = true
-    viewer.scene.globe.enableLighting = true
+    if (viewer.scene.globe) {
+      viewer.scene.globe.depthTestAgainstTerrain = true
+      viewer.scene.globe.enableLighting = true
+    }
     if (viewer.scene.skyBox) {
       viewer.scene.skyBox.show = true
     }
@@ -165,20 +173,24 @@ const CesiumGlobe = () => {
         viewerRef.current.destroy()
         viewerRef.current = null
       }
+      dataSourceRef.current = null
+      tilesetRef.current = null
     }
   }, [resetView])
 
   // Update entities when data changes
   useEffect(() => {
     const dataSource = dataSourceRef.current
-    if (!dataSource || events.length === 0) return
+    if (!dataSource) return
 
     // Clear existing
     dataSource.entities.removeAll()
 
+    if (events.length === 0) return
+
     // Add real events from Convex
     events.forEach((event: any) => {
-      if (!event.latitude || !event.longitude) return
+      if (event.latitude == null || event.longitude == null) return
 
       const isMilitary = event.properties?.military === true
       const color = getColorForEventType(event.eventType, isMilitary)
@@ -232,31 +244,28 @@ const CesiumGlobe = () => {
     })
   }, [activeLayers])
 
-  // Loading indicator
-  if (isLoading || !globeReady) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center bg-black text-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>{isLoading ? 'Loading real-time data...' : 'Initializing 3D Globe...'}</p>
-          {!GOOGLE_MAPS_API_KEY && (
-            <p className="text-xs text-yellow-400 mt-2">No Google Maps API key configured</p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <>
+    <div className="absolute inset-0">
       <div
         ref={cesiumContainer}
         className="absolute inset-0"
         style={{ width: '100%', height: '100%', background: '#000' }}
       />
+      {!globeReady && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black text-white z-10">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p>Initializing 3D Globe...</p>
+            {!GOOGLE_MAPS_API_KEY && (
+              <p className="text-xs text-yellow-400 mt-2">No Google Maps API key configured</p>
+            )}
+          </div>
+        </div>
+      )}
       {/* Data stats overlay */}
       <div className="absolute bottom-4 right-4 z-10 bg-black/70 text-white p-3 rounded-lg text-sm">
         <p className="font-semibold">Live Data:</p>
+        {isLoading && <p className="text-gray-400">Syncing data...</p>}
         <p>Total Events: {stats.total.toLocaleString()}</p>
         {Object.entries(stats.byType).map(([type, count]) => (
           <p key={type} className="text-gray-300">
@@ -264,7 +273,7 @@ const CesiumGlobe = () => {
           </p>
         ))}
       </div>
-    </>
+    </div>
   )
 }
 
