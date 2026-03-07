@@ -4,6 +4,7 @@ import cesium from 'vite-plugin-cesium'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  envDir: '..',
   plugins: [react(), cesium()],
   server: {
     port: 3000,

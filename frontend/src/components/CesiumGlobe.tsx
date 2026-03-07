@@ -62,13 +62,16 @@ const CesiumGlobe = () => {
       scene3DOnly: false,
       globe: new Cesium.Globe(Cesium.Ellipsoid.WGS84),
     })
+    viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 2)
 
     const initializeScene = async () => {
       // Try to add Google 3D Tiles if API key is available
       if (GOOGLE_MAPS_API_KEY) {
         try {
           // Create Google Photorealistic 3D Tiles tileset
-          const tileset = await Cesium.createGooglePhotorealistic3DTileset()
+          const tileset = await Cesium.createGooglePhotorealistic3DTileset({
+            key: GOOGLE_MAPS_API_KEY,
+          })
           
           viewer.scene.primitives.add(tileset)
           tilesetRef.current = tileset
