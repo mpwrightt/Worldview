@@ -3,10 +3,19 @@ import * as Cesium from 'cesium'
 import { useGlobeStore } from '../store/globeStore'
 import { useAllRealTimeData } from '../hooks/useRealTimeData'
 
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || ''
+
+// Set Cesium Ion token if available
+if (CESIUM_ION_TOKEN) {
+  Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN
+}
+
 const CesiumGlobe = () => {
   const cesiumContainer = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
   const dataSourceRef = useRef<Cesium.CustomDataSource | null>(null)
+  const tilesetRef = useRef<any>(null)
   const { activeLayers } = useGlobeStore()
   const { events, stats, isLoading } = useAllRealTimeData()
   const [globeReady, setGlobeReady] = useState(false)
@@ -30,16 +39,11 @@ const CesiumGlobe = () => {
   useEffect(() => {
     if (!cesiumContainer.current || viewerRef.current) return
 
-    console.log('Initializing Cesium viewer...')
+    console.log('Initializing Cesium viewer with Google 3D Tiles...')
 
-    // Use a simpler base imagery that doesn't require API keys
-    const imageryProvider = new Cesium.TileMapServiceImageryProvider({
-      url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
-    })
-
+    // Create viewer with simple base layer first
     const viewer = new Cesium.Viewer(cesiumContainer.current, {
-      imageryProvider,
-      baseLayerPicker: false, // Disable since we have limited options without API keys
+      baseLayerPicker: false,
       geocoder: false,
       homeButton: true,
       sceneModePicker: true,
@@ -54,14 +58,70 @@ const CesiumGlobe = () => {
       scene3DOnly: false,
     })
 
-    // Hide the default credit display (Cesium Ion, Bing, etc.)
+    // Try to add Google 3D Tiles if API key is available
+    if (GOOGLE_MAPS_API_KEY) {
+      try {
+        // Create Google 3D Tiles tileset
+        const tileset = new Cesium.Cesium3DTileset({
+          url: `https://tile.googleapis.com/v1/3dtiles/root.json?key=${GOOGLE_MAPS_API_KEY}`,
+          showCreditsOnScreen: false,
+        })
+        
+        viewer.scene.primitives.add(tileset)
+        tilesetRef.current = tileset
+        
+        // Fly to San Francisco to show off the 3D buildings
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(-122.4194, 37.7749, 2000),
+          orientation: {
+            heading: Cesium.Math.toRadians(0),
+            pitch: Cesium.Math.toRadians(-45),
+            roll: 0,
+          },
+          duration: 0,
+        })
+        
+        console.log('Google 3D Tiles added successfully')
+      } catch (error) {
+        console.error('Failed to load Google 3D Tiles:', error)
+        // Fallback to default view
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(0, 20, 25000000),
+          orientation: {
+            heading: Cesium.Math.toRadians(0),
+            pitch: Cesium.Math.toRadians(-90),
+            roll: 0,
+          },
+        })
+      }
+    } else {
+      console.warn('No Google Maps API key found, using default globe')
+      // Use Natural Earth as fallback
+      viewer.imageryLayers.removeAll()
+      viewer.imageryLayers.addImageryProvider(
+        new Cesium.TileMapServiceImageryProvider({
+          url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
+        })
+      )
+      
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(0, 20, 25000000),
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-90),
+          roll: 0,
+        },
+      })
+    }
+
+    // Hide the default credit display
     const creditContainer = viewer.cesiumWidget.creditContainer as HTMLElement
     if (creditContainer) {
       creditContainer.style.display = 'none'
     }
 
     const controller = viewer.scene.screenSpaceCameraController
-    controller.minimumZoomDistance = 1000
+    controller.minimumZoomDistance = 100
     controller.maximumZoomDistance = 100000000
     controller.enableRotate = true
     controller.enableTranslate = true
@@ -73,7 +133,7 @@ const CesiumGlobe = () => {
       Cesium.CameraEventType.PINCH,
     ]
     
-    viewer.scene.globe.depthTestAgainstTerrain = false
+    viewer.scene.globe.depthTestAgainstTerrain = true
     viewer.scene.globe.enableLighting = true
     if (viewer.scene.skyBox) {
       viewer.scene.skyBox.show = true
@@ -82,15 +142,6 @@ const CesiumGlobe = () => {
       viewer.scene.skyAtmosphere.show = true
     }
     viewer.scene.backgroundColor = Cesium.Color.BLACK
-    
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(0, 20, 25000000),
-      orientation: {
-        heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-90),
-        roll: 0,
-      },
-    })
 
     // Create a data source for all entities
     const dataSource = new Cesium.CustomDataSource('realtimeData')
@@ -99,7 +150,7 @@ const CesiumGlobe = () => {
 
     viewerRef.current = viewer
     setGlobeReady(true)
-    console.log('Cesium viewer initialized successfully')
+    console.log('Cesium viewer initialized')
     
     ;(window as any).resetCesiumView = resetView
     ;(window as any).getCesiumViewer = () => viewer
@@ -176,13 +227,16 @@ const CesiumGlobe = () => {
     })
   }, [activeLayers])
 
-  // Loading indicator - show even when data is loaded but globe isn't ready
+  // Loading indicator
   if (isLoading || !globeReady) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-black text-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
           <p>{isLoading ? 'Loading real-time data...' : 'Initializing 3D Globe...'}</p>
+          {!GOOGLE_MAPS_API_KEY && (
+            <p className="text-xs text-yellow-400 mt-2">No Google Maps API key configured</p>
+          )}
         </div>
       </div>
     )
