@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import * as Cesium from 'cesium'
 import { useGlobeStore } from '../store/globeStore'
 import { useAllRealTimeData } from '../hooks/useRealTimeData'
@@ -9,6 +9,7 @@ const CesiumGlobe = () => {
   const dataSourceRef = useRef<Cesium.CustomDataSource | null>(null)
   const { activeLayers } = useGlobeStore()
   const { events, stats, isLoading } = useAllRealTimeData()
+  const [globeReady, setGlobeReady] = useState(false)
 
   const resetView = useCallback(() => {
     const viewer = viewerRef.current
@@ -29,9 +30,16 @@ const CesiumGlobe = () => {
   useEffect(() => {
     if (!cesiumContainer.current || viewerRef.current) return
 
+    console.log('Initializing Cesium viewer...')
+
+    // Use a simpler base imagery that doesn't require API keys
+    const imageryProvider = new Cesium.TileMapServiceImageryProvider({
+      url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
+    })
+
     const viewer = new Cesium.Viewer(cesiumContainer.current, {
-      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
-      baseLayerPicker: true,
+      imageryProvider,
+      baseLayerPicker: false, // Disable since we have limited options without API keys
       geocoder: false,
       homeButton: true,
       sceneModePicker: true,
@@ -45,6 +53,12 @@ const CesiumGlobe = () => {
       skyAtmosphere: new Cesium.SkyAtmosphere(),
       scene3DOnly: false,
     })
+
+    // Hide the default credit display (Cesium Ion, Bing, etc.)
+    const creditContainer = viewer.cesiumWidget.creditContainer as HTMLElement
+    if (creditContainer) {
+      creditContainer.style.display = 'none'
+    }
 
     const controller = viewer.scene.screenSpaceCameraController
     controller.minimumZoomDistance = 1000
@@ -84,6 +98,9 @@ const CesiumGlobe = () => {
     dataSourceRef.current = dataSource
 
     viewerRef.current = viewer
+    setGlobeReady(true)
+    console.log('Cesium viewer initialized successfully')
+    
     ;(window as any).resetCesiumView = resetView
     ;(window as any).getCesiumViewer = () => viewer
 
@@ -159,13 +176,13 @@ const CesiumGlobe = () => {
     })
   }, [activeLayers])
 
-  // Loading indicator
-  if (isLoading) {
+  // Loading indicator - show even when data is loaded but globe isn't ready
+  if (isLoading || !globeReady) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-black text-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Loading real-time data...</p>
+          <p>{isLoading ? 'Loading real-time data...' : 'Initializing 3D Globe...'}</p>
         </div>
       </div>
     )
