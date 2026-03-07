@@ -58,33 +58,54 @@ const CesiumGlobe = () => {
       scene3DOnly: false,
     })
 
-    // Try to add Google 3D Tiles if API key is available
-    if (GOOGLE_MAPS_API_KEY) {
-      try {
-        // Create Google 3D Tiles tileset
-        const tileset = new Cesium.Cesium3DTileset({
-          url: `https://tile.googleapis.com/v1/3dtiles/root.json?key=${GOOGLE_MAPS_API_KEY}`,
-          showCreditsOnScreen: false,
-        })
+    const initializeScene = async () => {
+      // Try to add Google 3D Tiles if API key is available
+      if (GOOGLE_MAPS_API_KEY) {
+        try {
+          // Create Google 3D Tiles tileset
+          const tileset = await Cesium.Cesium3DTileset.fromUrl(
+            `https://tile.googleapis.com/v1/3dtiles/root.json?key=${GOOGLE_MAPS_API_KEY}`,
+            {
+              showCreditsOnScreen: false,
+            }
+          )
+          
+          viewer.scene.primitives.add(tileset)
+          tilesetRef.current = tileset
+          
+          // Fly to San Francisco to show off the 3D buildings
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(-122.4194, 37.7749, 2000),
+            orientation: {
+              heading: Cesium.Math.toRadians(0),
+              pitch: Cesium.Math.toRadians(-45),
+              roll: 0,
+            },
+            duration: 0,
+          })
+          
+          console.log('Google 3D Tiles added successfully')
+        } catch (error) {
+          console.error('Failed to load Google 3D Tiles:', error)
+          // Fallback to default view
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(0, 20, 25000000),
+            orientation: {
+              heading: Cesium.Math.toRadians(0),
+              pitch: Cesium.Math.toRadians(-90),
+              roll: 0,
+            },
+          })
+        }
+      } else {
+        console.warn('No Google Maps API key found, using default globe')
+        // Use Natural Earth as fallback
+        viewer.imageryLayers.removeAll()
+        const imageryProvider = await Cesium.TileMapServiceImageryProvider.fromUrl(
+          Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII')
+        )
+        viewer.imageryLayers.addImageryProvider(imageryProvider)
         
-        viewer.scene.primitives.add(tileset)
-        tilesetRef.current = tileset
-        
-        // Fly to San Francisco to show off the 3D buildings
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(-122.4194, 37.7749, 2000),
-          orientation: {
-            heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-45),
-            roll: 0,
-          },
-          duration: 0,
-        })
-        
-        console.log('Google 3D Tiles added successfully')
-      } catch (error) {
-        console.error('Failed to load Google 3D Tiles:', error)
-        // Fallback to default view
         viewer.camera.setView({
           destination: Cesium.Cartesian3.fromDegrees(0, 20, 25000000),
           orientation: {
@@ -94,25 +115,9 @@ const CesiumGlobe = () => {
           },
         })
       }
-    } else {
-      console.warn('No Google Maps API key found, using default globe')
-      // Use Natural Earth as fallback
-      viewer.imageryLayers.removeAll()
-      viewer.imageryLayers.addImageryProvider(
-        new Cesium.TileMapServiceImageryProvider({
-          url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
-        })
-      )
-      
-      viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(0, 20, 25000000),
-        orientation: {
-          heading: Cesium.Math.toRadians(0),
-          pitch: Cesium.Math.toRadians(-90),
-          roll: 0,
-        },
-      })
     }
+
+    void initializeScene()
 
     // Hide the default credit display
     const creditContainer = viewer.cesiumWidget.creditContainer as HTMLElement
